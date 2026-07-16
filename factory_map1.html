@@ -588,12 +588,13 @@
         container.innerHTML = html;
 
         function createFactoryRow(f) {
-            return '<div class="factory-item" data-code="' + f.code + '" data-group="' + f.category + '">' +
-                '<span class="factory-erp">' + f.erp + '</span>' +
-                '<span class="factory-code">' + f.code + '</span>' +
-                '<span>' + f.name + '</span>' +
-                '<span class="factory-city">📍' + f.city + '</span></div>';
-        }
+    var erpSpan = f.erp ? '<span class="factory-erp">' + f.erp + '</span>' : '';
+    return '<div class="factory-item" data-code="' + f.code + '" data-group="' + f.category + '">' +
+        erpSpan +
+        '<span class="factory-code">' + f.code + '</span>' +
+        '<span>' + f.name + '</span>' +
+        '<span class="factory-city">📍' + f.city + '</span></div>';
+}
 
         document.querySelectorAll('.factory-item').forEach(function(item) {
             item.addEventListener('click', function(e) {
