@@ -619,7 +619,7 @@
     }
 
     // 使用 HTTPS 的地图数据源
-    fetch('https://geo.datav.aliyun.com/areas_v3/bound/100000_full.json')
+    fetch('https://geojson.cn/api/data/china.json')
         .then(function(res) { return res.json(); })
         .then(function(geo) {
             echarts.registerMap('china', geo);
