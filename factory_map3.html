@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>中国区产品线 · 工厂可视化地图</title>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #f0f2f5;
+            font-family: 'Microsoft YaHei', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .dashboard {
+            width: 1400px;
+            max-width: 100%;
+            height: 900px;
+            background: #ffffff;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.12);
+            display: flex;
+            overflow: hidden;
+        }
+        .left-panel {
+            width: 380px;
+            background: #f9fafb;
+            border-right: 1px solid #e5e7eb;
+            display: flex;
+            flex-direction: column;
+        }
+        .panel-header { padding: 20px; border-bottom: 1px solid #e5e7eb; background: #ffffff; }
+        .panel-header h2 { font-size: 20px; font-weight: 700; color: #111827; }
+        .panel-header small { font-size: 13px; color: #6b7280; }
+        .list-container { flex: 1; overflow-y: auto; padding: 12px; }
+        .product-group {
+            margin-bottom: 16px;
+            background: #ffffff;
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid #e5e7eb;
+        }
+        .group-header {
+            padding: 12px 16px;
+            font-weight: 700;
+            font-size: 15px;
+            color: #ffffff;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .group-header:hover { opacity: 0.9; }
+        .group-header.active { box-shadow: inset 0 0 0 3px rgba(255,255,255,0.6); }
+        .group-body { padding: 8px 0; }
+        .sub-title {
+            font-size: 12px;
+            font-weight: 700;
+            color: #6b7280;
+            padding: 6px 16px;
+            background: #f9fafb;
+        }
+        .factory-item {
+            display: flex;
+            align-items: center;
+            padding: 8px 16px;
+            cursor: pointer;
+            border-left: 3px solid transparent;
+            font-size: 13px;
+            color: #374151;
+            gap: 6px;
+        }
+        .factory-item:hover { background: #f3f4f6; }
+        .factory-item.active {
+            background: #fef3c7;
+            border-left-color: #f59e0b;
+            font-weight: 600;
+        }
+        .factory-erp {
+            font-weight: 700;
+            font-size: 11px;
+            background: #e0e7ff;
+            color: #3730a3;
+            padding: 2px 8px;
+            border-radius: 10px;
+        }
+        .factory-code {
+            font-weight: 700;
+            font-size: 12px;
+            background: #f1f5f9;
+            padding: 2px 8px;
+            border-radius: 10px;
+            color: #4b5563;
+        }
+        .factory-city { margin-left: auto; font-size: 11px; color: #9ca3af; }
+        .right-panel { flex: 1; display: flex; flex-direction: column; }
+        .map-header {
+            padding: 16px 20px;
+            font-weight: 600;
+            color: #1e293b;
+            border-bottom: 1px solid #f1f5f9;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .map-container { flex: 1; }
+        .btn {
+            padding: 6px 14px;
+            border: 1px solid #d1d5db;
+            background: #ffffff;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            color: #374151;
+        }
+        .btn:hover { background: #f3f4f6; }
+        .btn.primary { background: #1e40af; color: #ffffff; border-color: #1e40af; }
+        .status-text {
+            font-size: 12px;
+            color: #6b7280;
+            padding: 4px 12px;
+            background: #f1f5f9;
+            border-radius: 12px;
+        }
+    </style>
+</head>
+<body>
+<div class="dashboard">
+    <div class="left-panel">
+        <div class="panel-header">
+            <h2>产品线 · 工厂列表</h2>
+            <small>ACH 中国区 · 共23个工厂</small>
+        </div>
+        <div class="list-container" id="factoryList"></div>
+        <div style="padding:12px 20px;border-top:1px solid #e5e7eb;display:flex;gap:8px;">
+            <button class="btn primary" id="showAllBtn">显示全部</button>
+            <button class="btn" id="resetBtn">重置</button>
+        </div>
+    </div>
+    <div class="right-panel">
+        <div class="map-header">
+            <span>工厂地理分布（东部聚焦）</span>
+            <span class="status-text" id="statusText">鼠标靠近城市 → 图标自动展开</span>
+        </div>
+        <div class="map-container" id="mapChart"></div>
+    </div>
+</div>
+
+<script>
+(function() {
+    var factories = [
+        { erp: "ACW", code: "CNS2SW", name: "上海奉贤方向盘", city: "上海", category: "方向盘", lng: 121.474, lat: 30.917 },
+        { erp: "CXW", code: "CNBDSW", name: "保定方向盘", city: "保定", category: "方向盘", lng: 115.465, lat: 38.874 },
+        { erp: "CHW", code: "CNHFSW", name: "合肥方向盘", city: "合肥", category: "方向盘", lng: 117.227, lat: 31.820 },
+        { erp: "ACS", code: "CNSHAM", name: "上海气囊模块", city: "上海", category: "安全气囊", sub: "ACHMT_AM", lng: 121.43, lat: 31.20 },
+        { erp: "CCA", code: "CNCCAM", name: "长春气囊模块", city: "长春", category: "安全气囊", sub: "ACHMT_AM", lng: 125.324, lat: 43.887 },
+        { erp: "CGA", code: "CNGZAM", name: "广州气囊模块", city: "广州", category: "安全气囊", sub: "ACHMT_AM", lng: 113.264, lat: 23.129 },
+        { erp: "CXA", code: "CNBDAM", name: "保定气囊模块", city: "保定", category: "安全气囊", sub: "ACHMT_AM", lng: 115.482, lat: 38.867 },
+        { erp: "", code: "CNWUAM", name: "芜湖气囊模块", city: "芜湖", category: "安全气囊", sub: "ACHMT_AM", lng: 118.433, lat: 31.352 },
+        { erp: "CNC", code: "CNNTCT", name: "南通气垫", city: "南通", category: "安全气囊", sub: "ACHMT_CC", lng: 120.894, lat: 31.980 },
+        { erp: "CNF", code: "CNNTFT", name: "南通织物", city: "南通", category: "安全气囊", sub: "ACHMT_CC", lng: 120.888, lat: 31.975 },
+        { erp: "CJI", code: "CNJTIN", name: "金坛气体发生器", city: "金坛", category: "安全气囊", sub: "ACHIC", lng: 119.598, lat: 31.723 },
+        { erp: "CJJ", code: "CNJTII", name: "金坛点火具", city: "金坛", category: "安全气囊", sub: "ACHIC", lng: 119.582, lat: 31.715 },
+        { erp: "ACP", code: "CNJTPP", name: "金坛推进剂", city: "金坛", category: "安全气囊", sub: "ACHIC", lng: 119.610, lat: 31.730 },
+        { erp: "ATW", code: "CNTYSB", name: "美安 (Mei-An)", city: "台湾", category: "安全带", sub: "ACHSX_SB", lng: 120.52, lat: 24.05 },
+        { erp: "CCS", code: "CNCCSB", name: "长春安全带", city: "长春", category: "安全带", sub: "ACHSX_SB", lng: 125.315, lat: 43.892 },
+        { erp: "CGS", code: "CNGZSB", name: "广州安全带", city: "广州", category: "安全带", sub: "ACHSX_SB", lng: 113.270, lat: 23.135 },
+        { erp: "NHA", code: "CNNJSB", name: "南京安全带", city: "南京", category: "安全带", sub: "ACHSX_SB", lng: 118.797, lat: 32.058 },
+        { erp: "CNX", code: "CNNJWT", name: "南京申达零部件", city: "南京", category: "安全带", sub: "ACHSX_SC", lng: 118.790, lat: 32.045 },
+        { erp: "ACX", code: "CNTCWT", name: "太仓申达零部件", city: "太仓", category: "安全带", sub: "ACHSX_SC", lng: 121.130, lat: 31.458 },
+        { erp: "ACH", code: "CNSHOF", name: "上海管理公司", city: "上海", category: "其他/技术", lng: 121.458, lat: 31.222 },
+        { erp: "CTC", code: "CNSHTC", name: "上海技术中心", city: "上海", category: "其他/技术", lng: 121.436, lat: 31.205 },
+        { erp: "WHT", code: "CNWHTC", name: "武汉技术中心", city: "武汉", category: "其他/技术", lng: 114.305, lat: 30.593 },
+        { erp: "NHA_L", code: "CNNJOF", name: "南京模具中心", city: "南京", category: "其他/技术", lng: 118.802, lat: 32.065 }
+    ];
+
+    var colorMap = {
+        "方向盘": "#c44536",
+        "安全气囊": "#2f6f8f",
+        "安全带": "#538d4e",
+        "其他/技术": "#9b6fa3"
+    };
+
+    function getIcon(cat) {
+        var c = encodeURIComponent(colorMap[cat] || "#999");
+        if (cat === '方向盘') {
+            return 'image://data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><circle cx="24" cy="24" r="20" fill="' + c + '" stroke="%23fff" stroke-width="2"/><circle cx="24" cy="24" r="6" fill="%23fff"/><line x1="24" y1="4" x2="24" y2="18" stroke="%23fff" stroke-width="3"/><line x1="24" y1="30" x2="24" y2="44" stroke="%23fff" stroke-width="3"/><line x1="4" y1="24" x2="18" y2="24" stroke="%23fff" stroke-width="3"/><line x1="30" y1="24" x2="44" y2="24" stroke="%23fff" stroke-width="3"/></svg>';
+        } else if (cat === '安全气囊') {
+            return 'image://data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><circle cx="24" cy="24" r="18" fill="' + c + '" stroke="%23fff" stroke-width="2"/><circle cx="24" cy="24" r="8" fill="%23fff" opacity="0.9"/></svg>';
+        } else if (cat === '安全带') {
+            return 'image://data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><rect x="8" y="6" width="32" height="8" rx="3" fill="' + c + '" stroke="%23fff" stroke-width="2"/><path d="M18 14 L12 42 L36 42 L30 14 Z" fill="' + c + '" stroke="%23fff" stroke-width="2"/></svg>';
+        } else {
+            return 'image://data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><rect x="10" y="8" width="28" height="32" rx="4" fill="' + c + '" stroke="%23fff" stroke-width="2"/><rect x="16" y="14" width="16" height="10" fill="%23fff" opacity="0.7"/></svg>';
+        }
+    }
+
+    // 按城市聚合
+    var cityMap = {};
+    factories.forEach(function(f) {
+        if (!cityMap[f.city]) cityMap[f.city] = { city: f.city, lng: f.lng, lat: f.lat, factories: [], cats: [] };
+        cityMap[f.city].factories.push(f);
+        if (cityMap[f.city].cats.indexOf(f.category) === -1) cityMap[f.city].cats.push(f.category);
+    });
+    var allCities = [];
+    for (var k in cityMap) allCities.push(cityMap[k]);
+
+    var hoveredCity = null;
+    var currentMode = 'all';
+    var currentCode = null;
+    var currentGroup = null;
+
+    function buildData(hlCodes, hlGroup) {
+        var items = [];
+        var hlByCity = {};
+        if (hlCodes) {
+            hlCodes.forEach(function(c) {
+                var f = factories.find(function(x) { return x.code === c; });
+                if (f) { if (!hlByCity[f.city]) hlByCity[f.city] = []; hlByCity[f.city].push(f); }
+            });
+        }
+        if (hlGroup) {
+            factories.filter(function(f) { return f.category === hlGroup; }).forEach(function(f) {
+                if (!hlByCity[f.city]) hlByCity[f.city] = []; hlByCity[f.city].push(f);
+            });
+        }
+        var isHL = hlCodes || hlGroup;
+
+        allCities.forEach(function(city) {
+            var hlList = hlByCity[city.city] || [];
+            var hlCount = hlList.length;
+            var expand = (hoveredCity === city.city) || (isHL && hlCount > 0);
+            var single = (isHL && hlCount === 1);
+            var dispFacts = isHL ? hlList : city.factories;
+            var dispCats = [];
+            var catSet = {};
+            dispFacts.forEach(function(f) {
+                if (!catSet[f.category]) { catSet[f.category] = true;
+                    dispCats.push(f.category); }
+            });
+            var total = isHL ? hlCount : city.factories.length;
+            var ttHtml = dispFacts.map(function(f) { return '• [' + f.erp + '] ' + f.code + ' ' + f.name + ' (' + f
+                    .category + ')'; }).join('<br/>');
+
+            if (single) {
+                var sf = hlList[0];
+                items.push({
+                    type: 'single',
+                    erp: sf.erp,
+                    code: sf.code,
+                    city: city.city,
+                    value: [city.lng, city.lat],
+                    category: sf.category,
+                    count: 1,
+                    tt: ttHtml,
+                    symbol: getIcon(sf.category),
+                    symbolSize: 36,
+                    itemStyle: { color: colorMap[sf.category], borderColor: '#fff', borderWidth: 3,
+                        shadowBlur: 15, shadowColor: colorMap[sf.category] },
+                    label: { show: true, position: 'right', formatter: '{e|' + sf.erp + '} {c|' + sf.code +
+                            '}{t| ' + city.city + '}', rich: { e: { fontSize: 13, fontWeight: 'bold',
+                                color: '#3730a3', backgroundColor: '#e0e7ff', borderRadius: 3,
+                                padding: [1, 5] }, c: { fontSize: 12, fontWeight: 'bold',
+                            color: '#111827', padding: [0, 0, 0, 4] }, t: { fontSize: 11,
+                            color: '#6b7280' } }, offset: [10, 0] }
+                });
+                return;
+            }
+
+            var off = expand ? 0.07 : 0.018;
+            var sz = expand ? 28 : 22;
+            for (var i = 0; i < dispCats.length; i++) {
+                var cat = dispCats[i];
+                var ol, oa;
+                if (dispCats.length === 1) { ol = city.lng;
+                    oa = city.lat; } else if (dispCats.length === 2) { ol = city.lng + (i - 0.5) * off * 3;
+                    oa = city.lat; } else if (dispCats.length === 3) { var a = (i / 3) * Math.PI * 2 - Math.PI / 2;
+                    ol = city.lng + Math.cos(a) * off * 2;
+                    oa = city.lat + Math.sin(a) * off * 1.5; } else { var a2 = (i / dispCats.length) * Math.PI * 2 -
+                        Math.PI / 2;
+                    ol = city.lng + Math.cos(a2) * off * 2.5;
+                    oa = city.lat + Math.sin(a2) * off * 1.8; }
+
+                var dim = isHL && hlGroup && cat !== hlGroup;
+                var item = { type: 'agg', city: city.city, value: [ol, oa], category: cat, count: total, tt: ttHtml };
+                if (!dim) {
+                    item.symbol = getIcon(cat);
+                    item.symbolSize = sz;
+                    item.itemStyle = { color: colorMap[cat], borderColor: '#fff', borderWidth: expand ? 2.5 : 1.5,
+                        shadowBlur: expand ? 10 : 3, shadowColor: 'rgba(0,0,0,0.15)' };
+                } else {
+                    item.symbol = 'circle';
+                    item.symbolSize = 8;
+                    item.itemStyle = { color: '#d1d5db', opacity: 0.3 };
+                }
+                if (i === 0) {
+                    item.label = !dim ? { show: true, position: 'right', formatter: '{t|' + city.city + '}{n| ' + total +
+                            '个}', rich: { t: { fontSize: 13, fontWeight: 'bold', color: '#1f2937',
+                            padding: [0, 0, 0, 4] }, n: { fontSize: 11, fontWeight: 'bold',
+                            color: '#374151', backgroundColor: '#f1f5f9', borderRadius: 4,
+                            padding: [2, 6] } }, offset: [expand ? 10 : 5, 0] } : { show: true,
+                        position: 'right', formatter: '{t|' + city.city + '}', rich: { t: { fontSize: 9,
+                                color: '#cbd5e1' } }, offset: [4, 0] };
+                } else { item.label = { show: false }; }
+                items.push(item);
+            }
+        });
+        return items;
+    }
+
+    var chart = echarts.init(document.getElementById('mapChart'));
+
+    function refresh(view) {
+        var d;
+        if (currentMode === 'code') d = buildData([currentCode], null);
+        else if (currentMode === 'group') d = buildData(null, currentGroup);
+        else d = buildData(null, null);
+        update(d, view);
+    }
+
+    function update(data, view) {
+        var opt = chart.getOption();
+        var sc = [118.5, 33.5],
+            sz = 3.8;
+        if (opt && opt.geo && opt.geo.length > 0) { sc = opt.geo[0].center || sc;
+            sz = opt.geo[0].zoom || sz; }
+        if (view) { sc = view.center;
+            sz = view.zoom; }
+
+        chart.setOption({
+            tooltip: {
+                trigger: 'item',
+                backgroundColor: '#fff',
+                borderColor: '#e5e7eb',
+                borderWidth: 2,
+                padding: [12, 16],
+                textStyle: { color: '#1f2937', fontSize: 13 },
+                formatter: function(p) {
+                    if (p.data && p.data.tt) {
+                        var t = p.data.type === 'single' ? '<b>[' + p.data.erp + '] ' + p.data.code + '</b> · ' +
+                            p.data.city : '<b>' + p.data.city + ' (' + p.data.count + '个)</b>';
+                        return t + '<br/><br/>' + p.data.tt;
+                    }
+                    return '';
+                }
+            },
+            geo: {
+                map: 'china',
+                roam: true,
+                silent: false,
+                center: sc,
+                zoom: sz,
+                label: { show: false },
+                itemStyle: { areaColor: '#f3f6f9', borderColor: '#d0d7de', borderWidth: 1 }
+            },
+            series: [{ type: 'scatter', coordinateSystem: 'geo', data: data, symbolSize: function(v) { return v
+                        .symbolSize || 22; }, emphasis: { scale: 1.3 } }]
+        });
+    }
+
+    chart.on('mousemove', 'geo', function(p) {
+        if (currentMode !== 'all') return;
+        var pt = [p.event.offsetX, p.event.offsetY];
+        var gc = chart.convertFromPixel('geo', pt);
+        if (!gc) return;
+        var cx = null,
+            md = Infinity;
+        allCities.forEach(function(c) { var d = Math.sqrt(Math.pow(c.lng - gc[0], 2) + Math.pow(c.lat - gc[1], 2)); if (
+                d < md && d < 1.2) { md = d;
+                cx = c.city; } });
+        if (hoveredCity !== cx) { hoveredCity = cx;
+            refresh();
+            document.getElementById('statusText').textContent = cx ? '鼠标靠近：' + cx + ' · 图标已展开' : '鼠标靠近城市 → 图标自动展开'; }
+    });
+    chart.getZr().on('mouseout', function() { if (currentMode !== 'all') return; if (hoveredCity) { hoveredCity = null;
+            refresh(); }
+        document.getElementById('statusText').textContent = '鼠标靠近城市 → 图标自动展开'; });
+
+    function showAll() { currentMode = 'all';
+        currentCode = null;
+        currentGroup = null;
+        hoveredCity = null;
+        refresh({ center: [118.5, 33.5], zoom: 3.8 });
+        document.getElementById('statusText').textContent = '全部工厂 · 鼠标靠近城市自动展开';
+        document.querySelectorAll('.factory-item,.group-header').forEach(function(e) { e.classList.remove('active'); }); }
+
+    function calcView(fl) {
+        if (!fl.length) return null;
+        var mnl = Infinity,
+            mxl = -Infinity,
+            mna = Infinity,
+            mxa = -Infinity;
+        fl.forEach(function(f) { if (f.lng < mnl) mnl = f.lng; if (f.lng > mxl) mxl = f.lng; if (f.lat < mna) mna = f
+                .lat; if (f.lat > mxa) mxa = f.lat; });
+        var cl = (mnl + mxl) / 2,
+            ca = (mna + mxa) / 2;
+        var rl = Math.max((mxl - mnl) * 1.6, 12),
+            ra = Math.max((mxa - mna) * 1.6, 10);
+        var z = 50 / Math.max(rl, ra * 1.2);
+        return { center: [cl, ca], zoom: Math.max(2, Math.min(z, 4.5)) };
+    }
+
+    function hlCode(c) { currentMode = 'code';
+        currentCode = c;
+        currentGroup = null;
+        hoveredCity = null; var f = factories.find(function(x) { return x.code === c; });
+        refresh(calcView(f ? [f] : []));
+        document.getElementById('statusText').textContent = f ? '高亮：[' + f.erp + '] ' + f.code + ' ' + f.name : '高亮工厂'; }
+
+    function hlGroup(g) { currentMode = 'group';
+        currentCode = null;
+        currentGroup = g;
+        hoveredCity = null;
+        refresh(calcView(factories.filter(function(f) { return f.category === g; })));
+        document.getElementById('statusText').textContent = '高亮产品线：' + g; }
+
+    function renderList() {
+        var h = '';
+        var grps = [
+            { n: "方向盘", i: "🟠", f: function(f) { return f.category === "方向盘"; } },
+            { n: "安全气囊", i: "🔵", f: function(f) { return f.category === "安全气囊"; }, s: [
+                    { l: "ACHMT_AM 模块", f: function(f) { return f.sub === "ACHMT_AM"; } },
+                    { l: "ACHMT_CC 纺织/气垫", f: function(f) { return f.sub === "ACHMT_CC"; } },
+                    { l: "ACHIC 气体发生器", f: function(f) { return f.sub === "ACHIC"; } }
+                ] },
+            { n: "安全带", i: "🟢", f: function(f) { return f.category === "安全带"; }, s: [
+                    { l: "ACHSX_SB 装配", f: function(f) { return f.sub === "ACHSX_SB"; } },
+                    { l: "ACHSX_SC 零部件", f: function(f) { return f.sub === "ACHSX_SC"; } }
+                ] },
+            { n: "其他/技术", i: "🟣", f: function(f) { return f.category === "其他/技术"; } }
+        ];
+        grps.forEach(function(g) {
+            var gf = factories.filter(g.f);
+            h += '<div class="product-group"><div class="group-header" style="background:' + colorMap[g.n] +
+                ';" data-group="' + g.n + '">' + g.i + ' ' + g.n + ' (' + gf.length + '个)</div><div class="group-body">';
+            if (g.s) {
+                g.s.forEach(function(s) {
+                    var sf = gf.filter(s.f);
+                    if (sf.length) { h += '<div class="sub-title">' + s.l + ' (' + sf.length + '个)</div>';
+                        sf.forEach(function(f) { h += row(f); }); }
+                });
+            } else { gf.forEach(function(f) { h += row(f); }); }
+            h += '</div></div>';
+        });
+
+        function row(f) {
+            var e = f.erp ? '<span class="factory-erp">' + f.erp + '</span>' : '';
+            return '<div class="factory-item" data-code="' + f.code + '" data-group="' + f.category + '">' + e +
+                '<span class="factory-code">' + f.code + '</span><span>' + f.name + '</span><span class="factory-city">' +
+                f.city + '</span></div>';
+        }
+        document.getElementById('factoryList').innerHTML = h;
+        document.querySelectorAll('.factory-item').forEach(function(el) {
+            el.addEventListener('click', function(e) {
+                e.stopPropagation();
+                document.querySelectorAll('.factory-item,.group-header').forEach(function(x) { x.classList.remove(
+                        'active'); });
+                this.classList.add('active');
+                hlCode(this.dataset.code);
+            });
+        });
+        document.querySelectorAll('.group-header').forEach(function(el) {
+            el.addEventListener('click', function(e) {
+                e.stopPropagation();
+                document.querySelectorAll('.factory-item,.group-header').forEach(function(x) { x.classList.remove(
+                        'active'); });
+                this.classList.add('active');
+                hlGroup(this.dataset.group);
+            });
+        });
+    }
+
+    // 加载地图数据
+    var s = document.createElement('script');
+    s.src = 'https://geo.datav.aliyun.com/areas_v3/bound/100000_full.json';
+    s.onload = function() {
+        // DataV 返回的是 JSON，script 加载后会在 window 上
+        // 需要用 XHR 方式获取
+    };
+    document.head.appendChild(s);
+
+    // 用 XHR 方式加载（更可靠）
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', 'https://geo.datav.aliyun.com/areas_v3/bound/100000_full.json', true);
+    xhr.onload = function() {
+        if (xhr.status === 200) {
+            echarts.registerMap('china', JSON.parse(xhr.responseText));
+            showAll();
+        }
+    };
+    xhr.onerror = function() {
+        document.getElementById('statusText').textContent = '地图加载失败，请检查网络';
+    };
+    xhr.send();
+
+    document.getElementById('showAllBtn').addEventListener('click', showAll);
+    document.getElementById('resetBtn').addEventListener('click', showAll);
+    chart.on('click', 'geo', showAll);
+    window.addEventListener('resize', function() { chart.resize(); });
+    renderList();
+})();
+</script>
+</body>
+</html>
